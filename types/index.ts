@@ -37,7 +37,7 @@ export interface EventFormData {
 export interface AuditLog {
   id: string
   eventId: string
-  action: 'confirmed'
+  action: SessionStatus
   adminId: string
   adminName: string
   timestamp: Date
