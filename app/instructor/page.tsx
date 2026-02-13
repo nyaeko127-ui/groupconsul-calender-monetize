@@ -41,14 +41,17 @@ export default function InstructorPage() {
   const handleSubmitEvent = (formData: EventFormData) => {
     if (!currentUser) return
 
+    const selectedDate = formData.date
+    const yearMonth = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`
     const newEvent: EventDate = {
       id: `event-${Date.now()}-${Math.random()}`,
       instructorId: currentUser.id,
       instructorName: currentUser.name,
-      date: formData.date,
-      startTime: formData.startTime,
-      endTime: formData.endTime,
-      status: 'pending',
+      month: yearMonth,
+      date: selectedDate,
+      timeSlot: formData.timeSlot,
+      memo: formData.memo,
+      status: 'submitted',
       submittedAt: new Date(),
     }
 
@@ -115,8 +118,6 @@ export default function InstructorPage() {
                     className={`p-4 border rounded-lg ${
                       event.status === 'confirmed'
                         ? 'border-green-500 bg-green-50'
-                        : event.status === 'rejected'
-                        ? 'border-red-500 bg-red-50'
                         : 'border-yellow-500 bg-yellow-50'
                     }`}
                   >
@@ -130,7 +131,7 @@ export default function InstructorPage() {
                           })}
                         </p>
                         <p className="text-gray-600">
-                          {event.startTime} ~ {event.endTime}
+                          {event.timeSlot}
                         </p>
                         <p className="text-sm text-gray-500 mt-1">
                           提出日: {event.submittedAt.toLocaleString('ja-JP')}
@@ -140,16 +141,10 @@ export default function InstructorPage() {
                         className={`px-3 py-1 rounded-full text-sm font-medium ${
                           event.status === 'confirmed'
                             ? 'bg-green-200 text-green-800'
-                            : event.status === 'rejected'
-                            ? 'bg-red-200 text-red-800'
                             : 'bg-yellow-200 text-yellow-800'
                         }`}
                       >
-                        {event.status === 'confirmed'
-                          ? '確定'
-                          : event.status === 'rejected'
-                          ? '却下'
-                          : '審査中'}
+                        {event.status === 'confirmed' ? '確定' : '審査中'}
                       </span>
                     </div>
                   </div>
