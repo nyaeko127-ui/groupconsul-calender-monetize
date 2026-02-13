@@ -48,6 +48,7 @@ const sessionCandidateToDbRow = (event: SessionCandidate): Omit<DBSessionCandida
   status: event.status,
   submitted_at: event.submittedAt.toISOString(),
   confirmed_at: event.confirmedAt ? event.confirmedAt.toISOString() : null,
+  google_calendar_event_id: event.googleCalendarEventId ?? null,
 })
 
 // DBの行をAuditLogに変換
