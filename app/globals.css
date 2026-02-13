@@ -1,0 +1,525 @@
+@import 'react-big-calendar/lib/css/react-big-calendar.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* 開催候補日時の提出セクション：表示範囲を固定せずカレンダー全体が表示されるようにする */
+section[aria-label="開催候補日時の提出"] {
+  overflow: visible !important;
+  max-height: none !important;
+  height: auto !important;
+  min-height: 0 !important;
+}
+section[aria-label="開催候補日時の提出"] .rbc-calendar,
+section[aria-label="開催候補日時の提出"] .rbc-month-view {
+  overflow: visible !important;
+  height: fit-content !important;
+  min-height: auto !important;
+  max-height: none !important;
+}
+
+/* 運営カレンダー（候補日時の確認・確定）：スクロールせずカレンダー全体を表示 */
+section[aria-label="候補日時の確認・確定"] {
+  overflow: visible !important;
+  max-height: none !important;
+  height: auto !important;
+  min-height: 0 !important;
+}
+section[aria-label="候補日時の確認・確定"] .rbc-calendar,
+section[aria-label="候補日時の確認・確定"] .rbc-month-view {
+  overflow: visible !important;
+  height: fit-content !important;
+  min-height: auto !important;
+  max-height: none !important;
+}
+
+/* 確定カレンダー：スクロールせずカレンダー全体を表示 */
+section[aria-label="確定カレンダー"] {
+  overflow: visible !important;
+  max-height: none !important;
+  height: auto !important;
+  min-height: 0 !important;
+}
+section[aria-label="確定カレンダー"] .rbc-calendar,
+section[aria-label="確定カレンダー"] .rbc-month-view {
+  overflow: visible !important;
+  height: fit-content !important;
+  min-height: auto !important;
+  max-height: none !important;
+}
+
+/* react-big-calendar カスタムスタイル */
+/* 日付を左上に・余白を抑えて上詰め */
+.rbc-date-cell {
+  text-align: left !important;
+  padding-left: 6px !important;
+  padding-top: 2px !important;
+  padding-right: 4px !important;
+  padding-bottom: 2px !important;
+}
+
+.rbc-date-cell > a,
+.rbc-date-cell > span,
+.rbc-date-cell > .rbc-button-link {
+  font-weight: 500;
+  font-size: 1.125rem !important;
+  color: #374151;
+  margin: 0 !important;
+  display: block !important;
+}
+
+@media (min-width: 640px) {
+  .rbc-date-cell > a,
+  .rbc-date-cell > span,
+  .rbc-date-cell > .rbc-button-link {
+    font-size: 1.25rem !important;
+  }
+}
+
+/* 今日の日付も他の日付と同様（太字にしない） */
+.rbc-date-cell.rbc-now,
+.rbc-date-cell.rbc-now > a,
+.rbc-date-cell.rbc-now > span,
+.rbc-date-cell.rbc-now > .rbc-button-link {
+  font-weight: 500 !important;
+}
+
+/* 月表示のヘッダー行（曜日）を中央揃え・文字サイズを大きく */
+.rbc-header {
+  text-align: center !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+}
+
+@media (min-width: 640px) {
+  .rbc-header {
+    font-size: 1.125rem !important;
+  }
+}
+
+/* 曜日ヘッダー「日」の枠: 薄い赤背景・赤文字（1列目） */
+.rbc-month-view .rbc-month-header .rbc-header:nth-child(1) {
+  background-color: #fef2f2 !important;
+  color: #dc2626 !important;
+}
+
+/* 曜日ヘッダー「土」の枠: 薄い青背景・青文字（7列目） */
+.rbc-month-view .rbc-month-header .rbc-header:nth-child(7) {
+  background-color: #eff6ff !important;
+  color: #2563eb !important;
+}
+
+/* 日曜のマス: 背景は透明、赤文字のみ（1列目） */
+.rbc-month-view .rbc-row-bg .rbc-day-bg:nth-child(1),
+.rbc-month-view .rbc-row-content .rbc-row .rbc-date-cell:nth-child(1) {
+  background-color: transparent !important;
+}
+.rbc-month-view .rbc-row-content .rbc-row .rbc-date-cell:nth-child(1) > a,
+.rbc-month-view .rbc-row-content .rbc-row .rbc-date-cell:nth-child(1) > span,
+.rbc-month-view .rbc-row-content .rbc-row .rbc-date-cell:nth-child(1) > .rbc-button-link {
+  color: #dc2626 !important; /* 赤文字 */
+}
+
+/* 土曜のマス: 背景は透明、青文字のみ（7列目） */
+.rbc-month-view .rbc-row-bg .rbc-day-bg:nth-child(7),
+.rbc-month-view .rbc-row-content .rbc-row .rbc-date-cell:nth-child(7) {
+  background-color: transparent !important;
+}
+.rbc-month-view .rbc-row-content .rbc-row .rbc-date-cell:nth-child(7) > a,
+.rbc-month-view .rbc-row-content .rbc-row .rbc-date-cell:nth-child(7) > span,
+.rbc-month-view .rbc-row-content .rbc-row .rbc-date-cell:nth-child(7) > .rbc-button-link {
+  color: #2563eb !important; /* 青文字 */
+}
+
+/* 表示月に含まれない日付（前月・翌月）：グレーアウト */
+.rbc-month-view .rbc-date-cell .rbc-off-range,
+.rbc-month-view .rbc-date-cell .rbc-off-range > a,
+.rbc-month-view .rbc-date-cell .rbc-off-range > span,
+.rbc-month-view .rbc-date-cell .rbc-off-range .rbc-button-link {
+  color: #6b7280 !important;
+}
+.rbc-month-view .rbc-row-bg .rbc-day-bg.rbc-off-range-bg {
+  background-color: #e5e7eb !important;
+}
+
+/* 「+○件」のリンク・ボタン：はっきり見えるように濃い色で表示 */
+.rbc-show-more,
+.rbc-month-view .show-more-btn {
+  background-color: #1d4ed8 !important;
+  color: #ffffff !important;
+  padding: 3px 8px !important;
+  border-radius: 4px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  display: inline-block !important;
+  margin-top: 2px !important;
+  cursor: pointer !important;
+  opacity: 1 !important;
+  border: none !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15) !important;
+}
+
+.rbc-show-more:hover,
+.rbc-month-view .show-more-btn:hover {
+  background-color: #1e40af !important;
+  color: #ffffff !important;
+}
+
+/* ポップアップのスタイル */
+.rbc-overlay {
+  max-width: 300px !important;
+  max-height: 400px !important;
+  overflow-y: auto !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important;
+}
+
+.rbc-overlay-header {
+  background-color: #f3f4f6 !important;
+  padding: 8px 12px !important;
+  font-weight: 600 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+/* カレンダー幅・高さ：行数に合わせてセクションの枠が揃うよう内容で高さを決める */
+.rbc-calendar {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: fit-content !important;
+  box-sizing: border-box !important;
+}
+
+/* カレンダーの枠線：縦・横すべて同じ太さ（右端は疑似要素で描き土曜右枠の太さを統一） */
+.rbc-month-view {
+  --cal-line: 2px;
+  position: relative;
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  border-left: var(--cal-line) solid #000 !important;
+  border-top: var(--cal-line) solid #000 !important;
+  border-bottom: var(--cal-line) solid #000 !important;
+  border-right: none !important;
+}
+/* ライブラリの枠線をすべて無効化（縦線は疑似要素で1本だけ描くため二重にならない） */
+.rbc-month-view .rbc-month-header .rbc-header,
+.rbc-month-view .rbc-month-header .rbc-header + .rbc-header,
+.rbc-month-view .rbc-row-bg .rbc-day-bg,
+.rbc-month-view .rbc-row-bg .rbc-day-bg + .rbc-day-bg,
+.rbc-month-view .rbc-row-content .rbc-row,
+.rbc-month-view .rbc-row-content .rbc-row .rbc-date-cell,
+.rbc-month-view .rbc-month-row {
+  border-left: none !important;
+  border-right: none !important;
+  border-top: none !important;
+  border-bottom: none !important;
+}
+.rbc-month-view > .rbc-month-header {
+  position: relative;
+  z-index: 1;
+  border-bottom: none !important; /* 下線は1行目の border-top で描く */
+}
+.rbc-month-view > .rbc-month-row {
+  position: relative;
+  z-index: 1;
+  border-top: var(--cal-line) solid #000 !important;
+}
+/* 縦線：列間・右端を同じ太さで描画（左端は .rbc-month-view の border-left のみで描くためここでは描かない） */
+.rbc-month-view::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(
+      to right,
+      transparent 0,
+      transparent calc(100% / 7 - var(--cal-line)),
+      #000 calc(100% / 7 - var(--cal-line)),
+      #000 calc(100% / 7)
+    ),
+    linear-gradient(to right, transparent calc(100% - var(--cal-line)), #000 calc(100% - var(--cal-line)), #000 100%);
+}
+
+/* 月表示：常に6行・行高128px・セル幅128pxで統一・中央配置 */
+.rbc-month-view {
+  --cal-row-height: 128px;
+  --cal-cell-width: 128px;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  /* 6行固定：高さ = ヘッダー + 6×128px */
+  height: fit-content !important;
+  align-content: flex-start !important;
+  /* 幅 = 7列×128px（セル幅統一）。親が狭い場合は横スクロール */
+  width: calc(7 * var(--cal-cell-width)) !important;
+  min-width: calc(7 * var(--cal-cell-width)) !important;
+  box-sizing: border-box !important;
+  /* カレンダーを中央に配置（講師・運営・確定すべて） */
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+.rbc-month-view > .rbc-month-header {
+  flex: 0 0 auto !important;
+}
+
+/* 曜日ヘッダー・行内セル：幅128pxで統一 */
+.rbc-month-view .rbc-month-header .rbc-header,
+.rbc-month-view .rbc-row-bg .rbc-day-bg,
+.rbc-month-view .rbc-row-content .rbc-row .rbc-date-cell {
+  flex: 0 0 var(--cal-cell-width) !important;
+  width: var(--cal-cell-width) !important;
+  min-width: var(--cal-cell-width) !important;
+  max-width: var(--cal-cell-width) !important;
+  box-sizing: border-box !important;
+}
+
+/* 週の行：常に6行・1行あたり128pxで統一 */
+.rbc-month-view > .rbc-month-row,
+.rbc-month-view .rbc-month-row,
+.rbc-month-view > div.rbc-month-row {
+  flex: 0 0 var(--cal-row-height) !important;
+  flex-grow: 0 !important;
+  flex-shrink: 0 !important;
+  height: var(--cal-row-height) !important;
+  min-height: var(--cal-row-height) !important;
+  max-height: var(--cal-row-height) !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+.rbc-month-view > .rbc-month-row:nth-child(2),
+.rbc-month-view > .rbc-month-row:nth-child(3),
+.rbc-month-view > .rbc-month-row:nth-child(4),
+.rbc-month-view > .rbc-month-row:nth-child(5),
+.rbc-month-view > .rbc-month-row:nth-child(6),
+.rbc-month-view > .rbc-month-row:nth-child(7) {
+  flex: 0 0 var(--cal-row-height) !important;
+  height: var(--cal-row-height) !important;
+  min-height: var(--cal-row-height) !important;
+  max-height: var(--cal-row-height) !important;
+}
+
+/* 行内の背景・コンテンツが行の高さを超えないように */
+.rbc-month-view .rbc-row-bg {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+}
+
+.rbc-month-view .rbc-row-bg {
+  display: flex !important;
+  flex-direction: row !important;
+}
+
+/* 6行・128px固定のためセル幅は .rbc-month-view の --cal-cell-width で統一済み */
+.rbc-month-view .rbc-row-bg .rbc-day-bg {
+  min-width: 0 !important;
+}
+
+.rbc-month-view .rbc-row-content {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  align-items: stretch !important;
+}
+
+/* 行：1行目は日付のみの高さ、2行目以降に予定（日付の真下に予定が来るように） */
+.rbc-month-view .rbc-row-content .rbc-row {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start !important;
+}
+/* 日付行だけ高さを内容に合わせて最小にし、予定を日付の直下に */
+.rbc-month-view .rbc-row-content > .rbc-row:first-child {
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* 日付セル：上詰め・余白を最小に */
+.rbc-month-view .rbc-row-content .rbc-date-cell {
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: visible !important;
+  padding-top: 0 !important;
+  padding-left: 6px !important;
+  padding-right: 4px !important;
+  padding-bottom: 2px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+}
+
+/* セル内ラッパー：日付・予定・チェックボックスを上詰め（余白なし） */
+.date-cell-wrapper {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+  align-items: flex-start !important;
+  gap: 0 !important;
+  min-height: 0 !important;
+}
+
+.date-cell-wrapper > * {
+  flex: 0 0 auto !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding-top: 0 !important;
+}
+
+.date-cell-wrapper > *:first-child {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* 日付の直下の余白をなくす（予定を日付の真下に表示） */
+.date-cell-wrapper > * > *:not(:first-child),
+.date-cell-wrapper .rbc-row-segment {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+/* 日付セル内の日付部分を1行分の高さに収める */
+.rbc-month-view .rbc-row-content > .rbc-row:first-child .rbc-date-cell {
+  padding-bottom: 0 !important;
+  min-height: 0 !important;
+}
+.rbc-month-view .rbc-row-content > .rbc-row:first-child .date-cell-wrapper {
+  padding-bottom: 0 !important;
+}
+
+/* 予定の表示を上詰めに */
+.rbc-month-view .rbc-row-segment {
+  overflow: visible !important;
+  align-self: flex-start !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding: 0 1px 1px 1px !important;
+}
+
+.rbc-month-view .rbc-date-cell .rbc-row-segment {
+  flex-shrink: 0 !important;
+}
+
+.rbc-month-view .rbc-row-segment .rbc-event-content,
+.rbc-month-view .rbc-row-segment .rbc-event-label {
+  overflow: visible !important;
+  white-space: normal !important;
+  text-overflow: clip !important;
+}
+
+/* 確定カレンダー：行の高さ180pxで統一・2件が重ならず表示できる高さ（nth-childも上書き） */
+.calendar-variant-confirmed .rbc-month-view > .rbc-month-row,
+.calendar-variant-confirmed .rbc-month-row,
+.calendar-variant-confirmed .rbc-month-view > .rbc-month-row:nth-child(n+2) {
+  flex: 0 0 180px !important;
+  height: 180px !important;
+  min-height: 180px !important;
+  max-height: 180px !important;
+  position: relative !important;
+}
+
+/* 確定カレンダー：グレーアウト背景を行全体（180px）に合わせる */
+.calendar-variant-confirmed .rbc-month-view .rbc-row-bg {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  height: 100% !important;
+  flex: none !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  align-items: stretch !important;
+  box-sizing: border-box !important;
+}
+
+/* 確定カレンダー：各日付背景セルを行の高さいっぱいに伸ばし、下の白余白をなくす */
+.calendar-variant-confirmed .rbc-month-view .rbc-row-bg .rbc-day-bg {
+  height: 100% !important;
+  min-height: 100% !important;
+  align-self: stretch !important;
+  box-sizing: border-box !important;
+}
+
+.calendar-variant-confirmed .rbc-month-view .rbc-row-content .rbc-date-cell {
+  padding-top: 2px !important;
+  padding-left: 4px !important;
+  padding-right: 2px !important;
+  padding-bottom: 2px !important;
+}
+
+/* 確定カレンダー：日付行（グルコン・講師対談の行）は右パディング0で右端まで表示 */
+.calendar-variant-confirmed .rbc-month-view .rbc-row-content > .rbc-row:first-child .rbc-date-cell {
+  padding-right: 0 !important;
+}
+
+/* 確定カレンダー：日付行のセル内を幅いっぱいにし、右側の余白をなくす（子を伸ばして右寄せが効くように） */
+.calendar-variant-confirmed .rbc-month-view .rbc-row-content > .rbc-row:first-child .rbc-date-cell > div {
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
+  align-self: stretch !important;
+  box-sizing: border-box !important;
+  padding-right: 0 !important;
+  margin-right: 0 !important;
+}
+.calendar-variant-confirmed .rbc-month-view .rbc-row-content > .rbc-row:first-child .rbc-date-cell > div > span {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* イベントの表示スタイル（コンパクト・中央揃え・重ならないよう間隔） */
+.rbc-event {
+  padding: 2px 4px !important;
+  font-size: 11px !important;
+  margin-bottom: 3px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  max-width: 92% !important;
+  box-sizing: border-box !important;
+}
+
+.calendar-variant-confirmed .rbc-event {
+  margin-bottom: 4px !important;
+}
+
+.rbc-event-content {
+  white-space: normal !important;
+  overflow: hidden !important;
+}
