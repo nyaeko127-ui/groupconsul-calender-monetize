@@ -36,17 +36,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // 日付と時間を解析（講師・運営共通）- 日本時間(JST)で組み立てる（サーバーがUTCだとズレるため）
-    const dateStr =
-      typeof date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(date)
-        ? date.slice(0, 10)
-        : (() => {
-            const d = new Date(date)
-            const y = d.getUTCFullYear()
-            const m = String(d.getUTCMonth() + 1).padStart(2, '0')
-            const day = String(d.getUTCDate()).padStart(2, '0')
-            return `${y}-${m}-${day}`
-          })()
+    // 日付と時間を解析（講師・運営共通）- 日本時間(JST)の「日付」で組み立てる
+    // クライアントが "2026-01-26 0:00 JST" を送ると ISO では "2026-01-25T15:00:00.000Z" になるため、
+    // UTC のまま日付を取ると1日ずれる。JST で日付を取る（+9h してから UTC 日付を取得）
+    const dateStr = (() => {
+      if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date.trim().slice(0, 10))) {
+        return date.trim().slice(0, 10)
+      }
+      const d = new Date(date)
+      const jstMs = d.getTime() + 9 * 60 * 60 * 1000
+      const jstDate = new Date(jstMs)
+      const y = jstDate.getUTCFullYear()
+      const m = String(jstDate.getUTCMonth() + 1).padStart(2, '0')
+      const day = String(jstDate.getUTCDate()).padStart(2, '0')
+      return `${y}-${m}-${day}`
+    })()
     const [startTime, endTime] = timeSlot.split('-')
     // JST (+09:00) の RFC3339 文字列で送る
     const startDateTime = `${dateStr}T${startTime}:00+09:00`
