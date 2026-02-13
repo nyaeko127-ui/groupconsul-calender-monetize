@@ -40,8 +40,10 @@ export async function POST(request: NextRequest) {
     // クライアントが "2026-01-26 0:00 JST" を送ると ISO では "2026-01-25T15:00:00.000Z" になるため、
     // UTC のまま日付を取ると1日ずれる。JST で日付を取る（+9h してから UTC 日付を取得）
     const dateStr = (() => {
-      if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date.trim().slice(0, 10))) {
-        return date.trim().slice(0, 10)
+      const s = typeof date === 'string' ? date.trim() : ''
+      // 厳密に "YYYY-MM-DD" のみのときだけそのまま使う（"2026-01-25T15:00:00.000Z" の先頭10文字で誤判定しない）
+      if (s.length === 10 && /^\d{4}-\d{2}-\d{2}$/.test(s)) {
+        return s
       }
       const d = new Date(date)
       const jstMs = d.getTime() + 9 * 60 * 60 * 1000

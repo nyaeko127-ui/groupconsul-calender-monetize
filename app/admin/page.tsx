@@ -8,6 +8,14 @@ import Calendar from '@/components/Calendar'
 import EventForm from '@/components/EventForm'
 import { SessionCandidate, User, EventFormData } from '@/types'
 
+/** カレンダー表示の日付を YYYY-MM-DD で返す（toISOString だとタイムゾーンで1日ずれるため API 用に使用） */
+function formatDateYYYYMMDD(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 export default function AdminPage() {
   const router = useRouter()
   const { data: session, status } = useSession()
@@ -244,7 +252,7 @@ export default function AdminPage() {
         body: JSON.stringify({
           instructorId: eventToConfirm.instructorId,
           instructorName: eventToConfirm.instructorName,
-          date: eventToConfirm.date.toISOString(),
+          date: formatDateYYYYMMDD(eventToConfirm.date),
           timeSlot: eventToConfirm.timeSlot,
           title: 'グルコン',
           adminEventTitle,
@@ -449,7 +457,7 @@ export default function AdminPage() {
             body: JSON.stringify({
               instructorId: event.instructorId,
               instructorName: event.instructorName,
-              date: event.date.toISOString(),
+              date: formatDateYYYYMMDD(event.date),
               timeSlot: event.timeSlot,
               title: 'グルコン',
             }),
@@ -680,7 +688,7 @@ export default function AdminPage() {
                               body: JSON.stringify({
                                 instructorId: event.instructorId,
                                 instructorName: event.instructorName,
-                                date: event.date.toISOString(),
+                                date: formatDateYYYYMMDD(event.date),
                                 timeSlot: event.timeSlot,
                                 title: 'グルコン',
                               }),
