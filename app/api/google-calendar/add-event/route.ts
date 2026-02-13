@@ -36,23 +36,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // 日付と時間を解析（講師・運営共通）
-    const eventDate = new Date(date)
+    // 日付と時間を解析（講師・運営共通）- 日本時間(JST)で組み立てる（サーバーがUTCだとズレるため）
+    const dateStr =
+      typeof date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(date)
+        ? date.slice(0, 10)
+        : (() => {
+            const d = new Date(date)
+            const y = d.getUTCFullYear()
+            const m = String(d.getUTCMonth() + 1).padStart(2, '0')
+            const day = String(d.getUTCDate()).padStart(2, '0')
+            return `${y}-${m}-${day}`
+          })()
     const [startTime, endTime] = timeSlot.split('-')
-    const [startHour] = startTime.split(':').map(Number)
-    const [endHour] = endTime.split(':').map(Number)
-    const startDateTime = new Date(eventDate)
-    startDateTime.setHours(startHour, 0, 0, 0)
-    const endDateTime = new Date(eventDate)
-    if (endHour === 24) {
-      endDateTime.setDate(endDateTime.getDate() + 1)
-      endDateTime.setHours(0, 0, 0, 0)
-    } else {
-      endDateTime.setHours(endHour, 0, 0, 0)
-    }
+    // JST (+09:00) の RFC3339 文字列で送る
+    const startDateTime = `${dateStr}T${startTime}:00+09:00`
+    const endDateTime =
+      endTime === '24:00'
+        ? (() => {
+            const [y, m, d] = dateStr.split('-').map(Number)
+            const next = new Date(Date.UTC(y, m - 1, d + 1))
+            const nextStr = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}-${String(next.getUTCDate()).padStart(2, '0')}`
+            return `${nextStr}T00:00:00+09:00`
+          })()
+        : `${dateStr}T${endTime}:00+09:00`
     const eventBody = {
-      start: { dateTime: startDateTime.toISOString(), timeZone: 'Asia/Tokyo' as const },
-      end: { dateTime: endDateTime.toISOString(), timeZone: 'Asia/Tokyo' as const },
+      start: { dateTime: startDateTime, timeZone: 'Asia/Tokyo' as const },
+      end: { dateTime: endDateTime, timeZone: 'Asia/Tokyo' as const },
     }
 
     // 講師のトークンを取得
