@@ -246,7 +246,6 @@ export default function Calendar({
           onSelectSlot={onSelectSlot || undefined}
           onSelectEvent={onSelectEvent ? (event) => onSelectEvent(event.resource) : undefined}
           selectable={!!onSelectSlot}
-          selectableRows={1}
           view={currentView}
           onView={setCurrentView}
           date={currentDate}
