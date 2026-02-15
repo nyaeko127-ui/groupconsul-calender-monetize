@@ -19,6 +19,7 @@ export interface DBSessionCandidate {
   confirmed_at: string | null
   created_at: string
   google_calendar_event_id: string | null
+  admin_google_calendar_event_id: string | null
 }
 
 export interface DBAuditLog {

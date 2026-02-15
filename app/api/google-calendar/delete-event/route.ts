@@ -30,57 +30,84 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { instructorId, googleCalendarEventId } = body
+    const { instructorId, googleCalendarEventId, adminEventId } = body
 
-    if (!instructorId || !googleCalendarEventId) {
+    if (!googleCalendarEventId && !adminEventId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // 講師のトークンを取得
-    const { data: tokenData, error: tokenError } = await supabase
-      .from('user_tokens')
-      .select('*')
-      .eq('user_id', instructorId)
-      .single()
-
-    if (tokenError || !tokenData) {
-      console.error('Token not found for instructor:', instructorId)
-      return NextResponse.json({ 
-        error: 'Instructor token not found',
-        message: '講師のGoogleカレンダー連携情報が見つかりません。'
-      }, { status: 404 })
-    }
-
-    // アクセストークンを取得（期限切れの場合はリフレッシュ）
-    let accessToken = tokenData.access_token
-    
-    if (tokenData.refresh_token) {
-      const newAccessToken = await refreshAccessToken(tokenData.refresh_token)
-      if (newAccessToken) {
-        accessToken = newAccessToken
-        await supabase
-          .from('user_tokens')
-          .update({ access_token: newAccessToken, updated_at: new Date().toISOString() })
-          .eq('user_id', instructorId)
-      }
-    }
-
-    // Google Calendar APIクライアントを設定
     const oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET
     )
-    oauth2Client.setCredentials({ access_token: accessToken })
 
-    const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
+    // 講師のGoogleカレンダーから削除
+    if (instructorId && googleCalendarEventId) {
+      const { data: tokenData, error: tokenError } = await supabase
+        .from('user_tokens')
+        .select('*')
+        .eq('user_id', instructorId)
+        .single()
 
-    // イベントを削除
-    await calendar.events.delete({
-      calendarId: 'primary',
-      eventId: googleCalendarEventId,
-    })
+      if (!tokenError && tokenData) {
+        let accessToken = tokenData.access_token
+        if (tokenData.refresh_token) {
+          const newAccessToken = await refreshAccessToken(tokenData.refresh_token)
+          if (newAccessToken) {
+            accessToken = newAccessToken
+            await supabase
+              .from('user_tokens')
+              .update({ access_token: newAccessToken, updated_at: new Date().toISOString() })
+              .eq('user_id', instructorId)
+          }
+        }
+        oauth2Client.setCredentials({ access_token: accessToken })
+        const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
+        try {
+          await calendar.events.delete({
+            calendarId: 'primary',
+            eventId: googleCalendarEventId,
+          })
+          console.log('Calendar event deleted (instructor):', googleCalendarEventId)
+        } catch (e: any) {
+          if (e.code !== 404 && e.code !== 410) throw e
+        }
+      }
+    }
 
-    console.log('Calendar event deleted:', googleCalendarEventId)
+    // 運営のGoogleカレンダーから削除
+    if (adminEventId && session.user?.id) {
+      const { data: adminTokenData, error: adminTokenError } = await supabase
+        .from('user_tokens')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .single()
+
+      if (!adminTokenError && adminTokenData) {
+        let adminToken = adminTokenData.access_token
+        if (adminTokenData.refresh_token) {
+          const newToken = await refreshAccessToken(adminTokenData.refresh_token)
+          if (newToken) {
+            adminToken = newToken
+            await supabase
+              .from('user_tokens')
+              .update({ access_token: newToken, updated_at: new Date().toISOString() })
+              .eq('user_id', session.user.id)
+          }
+        }
+        oauth2Client.setCredentials({ access_token: adminToken })
+        const adminCalendar = google.calendar({ version: 'v3', auth: oauth2Client })
+        try {
+          await adminCalendar.events.delete({
+            calendarId: 'primary',
+            eventId: adminEventId,
+          })
+          console.log('Calendar event deleted (admin):', adminEventId)
+        } catch (e: any) {
+          if (e.code !== 404 && e.code !== 410) throw e
+        }
+      }
+    }
 
     return NextResponse.json({
       success: true,

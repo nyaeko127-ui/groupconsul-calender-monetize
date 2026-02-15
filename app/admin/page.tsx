@@ -43,14 +43,23 @@ export default function AdminPage() {
     setConfirmedEvents(allEvents.filter((event) => event.status === 'confirmed'))
   }, [events])
 
-  useEffect(() => {
-    fetchEvents()
-    // 定期的にデータを再取得（5秒ごと）
-    const interval = setInterval(() => {
-      fetchEvents()
-    }, 5000)
-    return () => clearInterval(interval)
+  // 取得後にGoogleカレンダーで削除された予定を検知してDBから削除し、必要なら再取得
+  const fetchEventsAndSyncDeleted = useCallback(async () => {
+    await fetchEvents()
+    try {
+      const res = await fetch('/api/google-calendar/sync-deleted', { method: 'POST' })
+      const data = await res.json()
+      if (data.deletedEventIds?.length > 0) await fetchEvents()
+    } catch {
+      // 同期失敗時は握りつぶす（一覧は表示済み）
+    }
   }, [fetchEvents])
+
+  useEffect(() => {
+    fetchEventsAndSyncDeleted()
+    const interval = setInterval(fetchEventsAndSyncDeleted, 5000)
+    return () => clearInterval(interval)
+  }, [fetchEventsAndSyncDeleted])
 
   // 運営ユーザーを設定
   useEffect(() => {
@@ -146,9 +155,9 @@ export default function AdminPage() {
     setSelectedEventIdForEditDelete('')
   }
 
-  // Googleカレンダーから予定を削除するヘルパー関数
+  // Googleカレンダーから予定を削除するヘルパー関数（講師・運営の両方から削除）
   const deleteFromGoogleCalendar = async (event: SessionCandidate) => {
-    if (!event.googleCalendarEventId) return true // イベントIDがない場合は成功として扱う
+    if (!event.googleCalendarEventId && !event.adminGoogleCalendarEventId) return true
     
     try {
       const response = await fetch('/api/google-calendar/delete-event', {
@@ -156,7 +165,8 @@ export default function AdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           instructorId: event.instructorId,
-          googleCalendarEventId: event.googleCalendarEventId,
+          googleCalendarEventId: event.googleCalendarEventId ?? undefined,
+          adminEventId: event.adminGoogleCalendarEventId ?? undefined,
         }),
       })
       
@@ -176,8 +186,11 @@ export default function AdminPage() {
     if (!eventForEditDelete) return
     if (!confirm(`${formatEventOption(eventForEditDelete)} を削除しますか？`)) return
     
-    // 確定済みの予定の場合、Googleカレンダーからも削除
-    if (eventForEditDelete.status === 'confirmed' && eventForEditDelete.googleCalendarEventId) {
+    // 確定済みの予定の場合、講師・運営のGoogleカレンダーからも削除
+    if (
+      eventForEditDelete.status === 'confirmed' &&
+      (eventForEditDelete.googleCalendarEventId || eventForEditDelete.adminGoogleCalendarEventId)
+    ) {
       const gcalDeleted = await deleteFromGoogleCalendar(eventForEditDelete)
       if (!gcalDeleted) {
         alert('Googleカレンダーからの削除に失敗しましたが、システムからは削除します')
@@ -262,8 +275,11 @@ export default function AdminPage() {
       const data = await response.json()
       if (response.ok && data.eventId) {
         console.log('Googleカレンダーに予定を追加しました:', data)
-        // GoogleカレンダーのイベントIDを保存
-        updateEvent(eventId, { googleCalendarEventId: data.eventId })
+        // GoogleカレンダーのイベントIDを保存（講師・運営）
+        updateEvent(eventId, {
+          googleCalendarEventId: data.eventId,
+          ...(data.adminEventId && { adminGoogleCalendarEventId: data.adminEventId }),
+        })
       } else {
         console.error('Googleカレンダーへの追加に失敗:', data.message)
         // エラーがあっても確定自体は成功しているので、警告のみ表示
@@ -447,7 +463,21 @@ export default function AdminPage() {
         
         updateEventStatus(eventId, 'confirmed', user)
         
-        // Googleカレンダーに追加
+        // 運営カレンダー用の登録名（その日の確定件数で「グルコン」or「講師対談」）
+        const eventDateStr = formatDateYYYYMMDD(event.date)
+        const existingOnDate = getConfirmedOnDate(eventDateStr).filter(
+          (c) => !eventsToConfirm.some((t) => t.id === c.id)
+        ).length
+        const inBatchOnDate = eventsToConfirm.filter(
+          (e) => formatDateYYYYMMDD(e.date) === eventDateStr
+        ).length
+        const confirmedCountOnDate = existingOnDate + inBatchOnDate
+        const adminEventTitle =
+          confirmedCountOnDate === 1
+            ? `グルコン ${event.instructorName}`
+            : `講師対談 ${event.instructorName}`
+
+        // Googleカレンダーに追加（講師＋運営）
         try {
           const response = await fetch('/api/google-calendar/add-event', {
             method: 'POST',
@@ -460,11 +490,17 @@ export default function AdminPage() {
               date: formatDateYYYYMMDD(event.date),
               timeSlot: event.timeSlot,
               title: 'グルコン',
+              adminEventTitle,
             }),
           })
           
-          if (!response.ok) {
-            const data = await response.json()
+          const data = await response.json()
+          if (response.ok && data.eventId) {
+            updateEvent(event.id, {
+              googleCalendarEventId: data.eventId,
+              ...(data.adminEventId && { adminGoogleCalendarEventId: data.adminEventId }),
+            })
+          } else {
             failedEvents.push(`${event.instructorName}: ${data.message}`)
           }
         } catch (error) {
@@ -680,7 +716,21 @@ export default function AdminPage() {
                         for (const event of selectedEvents) {
                           updateEventStatus(event.id, 'confirmed', user)
                           
-                          // Googleカレンダーに追加
+                          // 運営カレンダー用の登録名（その日の確定件数で「グルコン」or「講師対談」）
+                          const eventDateStr = formatDateYYYYMMDD(event.date)
+                          const existingOnDate = getConfirmedOnDate(eventDateStr).filter(
+                            (c) => !selectedEvents.some((t) => t.id === c.id)
+                          ).length
+                          const inBatchOnDate = selectedEvents.filter(
+                            (e) => formatDateYYYYMMDD(e.date) === eventDateStr
+                          ).length
+                          const confirmedCountOnDate = existingOnDate + inBatchOnDate
+                          const adminEventTitle =
+                            confirmedCountOnDate === 1
+                              ? `グルコン ${event.instructorName}`
+                              : `講師対談 ${event.instructorName}`
+
+                          // Googleカレンダーに追加（講師＋運営）
                           try {
                             const response = await fetch('/api/google-calendar/add-event', {
                               method: 'POST',
@@ -691,12 +741,15 @@ export default function AdminPage() {
                                 date: formatDateYYYYMMDD(event.date),
                                 timeSlot: event.timeSlot,
                                 title: 'グルコン',
+                                adminEventTitle,
                               }),
                             })
                             const data = await response.json()
                             if (response.ok && data.eventId) {
-                              // GoogleカレンダーのイベントIDを保存
-                              updateEvent(event.id, { googleCalendarEventId: data.eventId })
+                              updateEvent(event.id, {
+                                googleCalendarEventId: data.eventId,
+                                ...(data.adminEventId && { adminGoogleCalendarEventId: data.adminEventId }),
+                              })
                             } else {
                               failedEvents.push(`${event.instructorName}: Googleカレンダー追加失敗`)
                             }

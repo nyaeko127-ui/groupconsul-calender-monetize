@@ -34,6 +34,7 @@ const dbRowToSessionCandidate = (row: DBSessionCandidate): SessionCandidate => (
   submittedAt: new Date(row.submitted_at),
   confirmedAt: row.confirmed_at ? new Date(row.confirmed_at) : undefined,
   googleCalendarEventId: row.google_calendar_event_id || undefined,
+  adminGoogleCalendarEventId: row.admin_google_calendar_event_id || undefined,
 })
 
 // SessionCandidateをDB形式に変換
@@ -49,6 +50,7 @@ const sessionCandidateToDbRow = (event: SessionCandidate): Omit<DBSessionCandida
   submitted_at: event.submittedAt.toISOString(),
   confirmed_at: event.confirmedAt ? event.confirmedAt.toISOString() : null,
   google_calendar_event_id: event.googleCalendarEventId ?? null,
+  admin_google_calendar_event_id: event.adminGoogleCalendarEventId ?? null,
 })
 
 // DBの行をAuditLogに変換
@@ -152,6 +154,7 @@ export const useEventStore = create<EventStore>((set, get) => ({
       if (sanitized.confirmedAt) dbUpdates.confirmed_at = sanitized.confirmedAt.toISOString()
       if (sanitized.submittedAt) dbUpdates.submitted_at = sanitized.submittedAt.toISOString()
       if (sanitized.googleCalendarEventId !== undefined) dbUpdates.google_calendar_event_id = sanitized.googleCalendarEventId || null
+      if (sanitized.adminGoogleCalendarEventId !== undefined) dbUpdates.admin_google_calendar_event_id = sanitized.adminGoogleCalendarEventId || null
 
       // dbUpdatesが空でないことを確認
       if (Object.keys(dbUpdates).length === 0) {

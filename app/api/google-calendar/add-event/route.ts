@@ -118,6 +118,7 @@ export async function POST(request: NextRequest) {
 
     console.log('Calendar event created (instructor):', response.data)
 
+    let adminEventId: string | undefined
     // 運営アカウントのGoogleカレンダーにも同じ予定を登録（adminEventTitle が渡された場合）
     if (adminEventTitle && session.user?.id) {
       try {
@@ -153,10 +154,11 @@ export async function POST(request: NextRequest) {
             description: `グルコン候補日システムから自動登録（運営用）\n講師: ${instructorName}`,
           }
 
-          await adminCalendar.events.insert({
+          const adminInsertResponse = await adminCalendar.events.insert({
             calendarId: 'primary',
             requestBody: adminEvent,
           })
+          adminEventId = adminInsertResponse.data.id ?? undefined
           console.log('Calendar event created (admin):', adminEventTitle)
         } else {
           console.warn('運営のGoogleカレンダー連携情報が見つかりません。運営でGoogleログインを行ってください。')
@@ -170,6 +172,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       eventId: response.data.id,
+      adminEventId: adminEventId ?? null,
       message: 'Googleカレンダーに予定を追加しました'
     })
 

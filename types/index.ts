@@ -21,7 +21,8 @@ export interface SessionCandidate {
   memo?: string
   submittedAt: Date
   confirmedAt?: Date
-  googleCalendarEventId?: string // Googleカレンダーに追加された予定のID
+  googleCalendarEventId?: string // 講師のGoogleカレンダーに追加された予定のID
+  adminGoogleCalendarEventId?: string // 運営のGoogleカレンダーに追加された予定のID
 }
 
 // 後方互換性のため、EventDate も残す（既存コードで使用）
