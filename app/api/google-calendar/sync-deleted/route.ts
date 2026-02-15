@@ -21,7 +21,7 @@ async function refreshAccessToken(refreshToken: string): Promise<string | null> 
 
 /** 指定ユーザーのGoogleカレンダーからイベントを削除（404/410は無視） */
 async function deleteFromUserCalendar(
-  oauth2Client: import('googleapis').google.auth.OAuth2,
+  oauth2Client: InstanceType<typeof google.auth.OAuth2>,
   userId: string,
   eventId: string
 ): Promise<void> {
