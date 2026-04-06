@@ -8,6 +8,13 @@ import Calendar from '@/components/Calendar'
 import EventForm from '@/components/EventForm'
 import { SessionCandidate, EventFormData, User, TimeSlot, GoogleCalendarEvent } from '@/types'
 
+const TIME_LABELS: Record<string, string> = {
+  '10:00-12:00': '10時〜12時',
+  '12:00-14:00': '12時〜14時',
+  '21:00-23:00': '21時〜23時',
+  '22:00-24:00': '22時〜24時',
+}
+
 // 日付をローカル YYYY-MM-DD に変換（コンポーネント外で定義）
 function toLocalDateStr(d: Date): string {
   const y = d.getFullYear()
@@ -272,7 +279,9 @@ export default function Home() {
         while (currentDate < endDate) {
           const dateStr = toJapanDateStr(currentDate)
           const conflictsForDate = conflicts.get(dateStr) || new Set<TimeSlot>()
-          // 終日イベントは両方の時間枠と重複
+          // 終日イベントは全ての時間枠と重複
+          conflictsForDate.add('10:00-12:00')
+          conflictsForDate.add('12:00-14:00')
           conflictsForDate.add('21:00-23:00')
           conflictsForDate.add('22:00-24:00')
           conflicts.set(dateStr, conflictsForDate)
@@ -316,6 +325,20 @@ export default function Home() {
       }
 
       const conflictsForDate = conflicts.get(startDateStr) || new Set<TimeSlot>()
+
+      // 10:00-12:00 (600-720分) との重複チェック
+      const slot10Start = 10 * 60 // 600分
+      const slot10End = 12 * 60 // 720分
+      if (eventStartMinutes < slot10End && eventEndMinutes > slot10Start) {
+        conflictsForDate.add('10:00-12:00')
+      }
+
+      // 12:00-14:00 (720-840分) との重複チェック
+      const slot12Start = 12 * 60 // 720分
+      const slot12End = 14 * 60 // 840分
+      if (eventStartMinutes < slot12End && eventEndMinutes > slot12Start) {
+        conflictsForDate.add('12:00-14:00')
+      }
 
       // 21:00-23:00 (1260-1380分) との重複チェック
       // 終了時間が21:00ちょうどの場合は表示する（> を使用）
@@ -377,7 +400,7 @@ export default function Home() {
             month: 'long',
             day: 'numeric',
           })
-          const timeStr = event.timeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'
+          const timeStr = TIME_LABELS[event.timeSlot] || event.timeSlot
           const message = `${dateStr} ${timeStr} の候補が確定されました！`
 
           setNotification({ message, event })
@@ -815,7 +838,7 @@ export default function Home() {
                           })}
                         </p>
                         <p className="text-gray-600">
-                          {event.timeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'}
+                          {TIME_LABELS[event.timeSlot] || event.timeSlot}
                         </p>
                         {event.memo && (
                           <p className="text-sm text-gray-600 mt-1 italic">
@@ -872,7 +895,7 @@ export default function Home() {
                       day: 'numeric',
                       weekday: 'short',
                     })
-                    const timeDisplay = timeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'
+                    const timeDisplay = TIME_LABELS[timeSlot] || timeSlot
                     return (
                       <div key={slot} className="text-sm py-1">
                         {dateDisplay} {timeDisplay}
@@ -880,6 +903,17 @@ export default function Home() {
                     )
                   })}
                 </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm text-gray-600 mb-2">備考（任意）</label>
+                <textarea
+                  value={memoText}
+                  onChange={(e) => setMemoText(e.target.value)}
+                  placeholder="例：月3回まで開催希望、グルコン2回、講師対談1回希望、⚪︎⚪︎講師と対談でお願いします。開催内容は⚪︎⚪︎についてです。"
+                  rows={3}
+                  className="w-full border rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
 
               <div className="flex gap-3">

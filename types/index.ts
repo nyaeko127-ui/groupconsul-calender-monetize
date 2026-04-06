@@ -7,7 +7,7 @@ export interface User {
   email: string
 }
 
-export type TimeSlot = '21:00-23:00' | '22:00-24:00'
+export type TimeSlot = '10:00-12:00' | '12:00-14:00' | '21:00-23:00' | '22:00-24:00'
 export type SessionStatus = 'submitted' | 'confirmed'
 
 export interface SessionCandidate {
@@ -16,7 +16,7 @@ export interface SessionCandidate {
   instructorName: string
   month: string // 例：2026-02
   date: Date
-  timeSlot: TimeSlot // 21:00-23:00 または 22:00-24:00
+  timeSlot: TimeSlot // 10:00-12:00, 12:00-14:00, 21:00-23:00, 22:00-24:00 のいずれか
   status: SessionStatus // 候補（提出）、確定
   memo?: string
   submittedAt: Date

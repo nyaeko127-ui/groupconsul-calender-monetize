@@ -8,6 +8,13 @@ import Calendar from '@/components/Calendar'
 import EventForm from '@/components/EventForm'
 import { SessionCandidate, User, EventFormData } from '@/types'
 
+const TIME_LABELS: Record<string, string> = {
+  '10:00-12:00': '10時〜12時',
+  '12:00-14:00': '12時〜14時',
+  '21:00-23:00': '21時〜23時',
+  '22:00-24:00': '22時〜24時',
+}
+
 /** カレンダー表示の日付を YYYY-MM-DD で返す（toISOString だとタイムゾーンで1日ずれるため API 用に使用） */
 function formatDateYYYYMMDD(d: Date): string {
   const y = d.getFullYear()
@@ -137,7 +144,7 @@ export default function AdminPage() {
 
   const formatEventOption = (e: SessionCandidate) => {
     const d = e.date.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })
-    const t = e.timeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'
+    const t = TIME_LABELS[e.timeSlot] || e.timeSlot
     return `${e.instructorName} | ${d} | ${t}`
   }
 
@@ -233,7 +240,7 @@ export default function AdminPage() {
       month: 'long',
       day: 'numeric',
     })
-    const timeStr = eventToConfirm.timeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'
+    const timeStr = TIME_LABELS[eventToConfirm.timeSlot] || eventToConfirm.timeSlot
 
     const check = checkCanConfirm(eventToConfirm)
     if (check) {
@@ -345,7 +352,7 @@ export default function AdminPage() {
       month: 'long',
       day: 'numeric',
     })
-    const timeStr = event.timeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'
+    const timeStr = TIME_LABELS[event.timeSlot] || event.timeSlot
     if (confirm(`${event.instructorName}の${dateStr} ${timeStr} の候補を削除しますか？`)) {
       // 確定済みの予定の場合、Googleカレンダーからも削除
       if (event.status === 'confirmed' && event.googleCalendarEventId) {
@@ -399,7 +406,7 @@ export default function AdminPage() {
           month: 'long',
           day: 'numeric',
         })
-        const timeStr = event.timeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'
+        const timeStr = TIME_LABELS[event.timeSlot] || event.timeSlot
         confirmErrors.push(`${dateStr} ${timeStr}（${event.instructorName}講師）→ この時間帯は既に2件確定済みのため追加できません`)
       }
     })
@@ -440,7 +447,7 @@ export default function AdminPage() {
             month: 'long',
             day: 'numeric',
           })
-          const timeStr = ev.timeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'
+          const timeStr = TIME_LABELS[ev.timeSlot] || ev.timeSlot
           alert(
             `${displayDate} の${timeStr}は確定が3件以上になります。\n\n時間の重複が3件以上あるため、同じ時間帯は2件までです。`
           )
@@ -666,7 +673,7 @@ export default function AdminPage() {
                       if (alreadyConfirmed.length > 0) {
                         const confirmedList = alreadyConfirmed.map(e => {
                           const dateStr = e.date.toLocaleDateString('ja-JP')
-                          const timeStr = e.timeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'
+                          const timeStr = TIME_LABELS[e.timeSlot] || e.timeSlot
                           return `${dateStr} ${timeStr}（${e.instructorName}）`
                         })
                         alert(`以下の予定は既に確定済みです：\n\n${confirmedList.join('\n')}\n\n確定済みの予定を再度確定することはできません。`)
@@ -679,7 +686,7 @@ export default function AdminPage() {
                         const check = checkCanConfirm(event)
                         if (check) {
                           const dateStr = event.date.toLocaleDateString('ja-JP')
-                          const timeStr = event.timeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'
+                          const timeStr = TIME_LABELS[event.timeSlot] || event.timeSlot
                           confirmErrors.push(`${dateStr} ${timeStr}（${event.instructorName}）→ この時間帯は既に2件確定済みのため追加できません`)
                         }
                       })
@@ -705,7 +712,7 @@ export default function AdminPage() {
                         ).length
                         if (existing + inBatch >= 3) {
                           const displayDate = ev.date.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })
-                          const timeStr = ev.timeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'
+                          const timeStr = TIME_LABELS[ev.timeSlot] || ev.timeSlot
                           alert(`${displayDate} の${timeStr}は確定が3件以上になります。\n\n時間の重複が3件以上あるため、同じ時間帯は2件までです。`)
                           return
                         }
@@ -888,7 +895,7 @@ export default function AdminPage() {
                               })}
                             </p>
                             <p className="text-gray-600">
-                              {event.timeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'}
+                              {TIME_LABELS[event.timeSlot] || event.timeSlot}
                             </p>
                             {event.memo && (
                               <p className="text-sm text-gray-500 mt-1 italic">
@@ -914,7 +921,7 @@ export default function AdminPage() {
                             onClick={(e) => {
                               e.stopPropagation()
                               const dateStr = new Date(event.date).toLocaleDateString('ja-JP')
-                              const timeStr = event.timeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'
+                              const timeStr = TIME_LABELS[event.timeSlot] || event.timeSlot
                               if (confirm(`${event.instructorName}の${dateStr} ${timeStr} の候補を削除しますか？`)) {
                                 deleteEvent(event.id, true)
                               }
@@ -960,7 +967,7 @@ export default function AdminPage() {
                           })}
                         </p>
                         <p className="text-gray-600">
-                          {event.timeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'}
+                          {TIME_LABELS[event.timeSlot] || event.timeSlot}
                         </p>
                         {event.memo && (
                           <p className="text-sm text-gray-500 mt-1 italic">
@@ -1003,7 +1010,7 @@ export default function AdminPage() {
                     month: 'long',
                     day: 'numeric',
                   })}{' '}
-                  {actionModalEvent.timeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'}
+                  {TIME_LABELS[actionModalEvent.timeSlot] || actionModalEvent.timeSlot}
                 </p>
               </div>
               <div className="space-y-3 mb-6">
@@ -1084,7 +1091,7 @@ export default function AdminPage() {
                 <div>
                   <p className="text-sm text-gray-500">時間</p>
                   <p className="font-medium">
-                    {selectedEvent.timeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'}
+                    {TIME_LABELS[selectedEvent.timeSlot] || selectedEvent.timeSlot}
                   </p>
                 </div>
                 {selectedEvent.memo && (

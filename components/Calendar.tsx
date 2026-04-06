@@ -2,6 +2,20 @@
 
 import { useState } from 'react'
 import { Calendar as BigCalendar, momentLocalizer, View } from 'react-big-calendar'
+
+const TIME_LABELS: Record<string, string> = {
+  '10:00-12:00': '10時〜12時',
+  '12:00-14:00': '12時〜14時',
+  '21:00-23:00': '21時〜23時',
+  '22:00-24:00': '22時〜24時',
+}
+
+const TIME_ORDER: Record<string, number> = {
+  '10:00-12:00': 0,
+  '12:00-14:00': 1,
+  '21:00-23:00': 2,
+  '22:00-24:00': 3,
+}
 import moment from 'moment'
 import 'moment/locale/ja'
 import { SessionCandidate, TimeSlot } from '@/types'
@@ -92,7 +106,7 @@ export default function Calendar({
   // ソート順: 確定→提出、同じステータス内では21時→22時
   const calcSortOrder = (status: string, timeSlot: string): number => {
     const statusPriority: Record<string, number> = { confirmed: 0, submitted: 10 }
-    const timePriority = timeSlot === '21:00-23:00' ? 0 : 1 // 21時が先
+    const timePriority = TIME_ORDER[timeSlot] ?? 99
     return (statusPriority[status] ?? 99) + timePriority
   }
 
@@ -115,7 +129,7 @@ export default function Calendar({
   // ソート順を計算：確定→提出、同じステータス内では21時→22時
   const getSortOrder = (status: string, timeSlot: string): number => {
     const statusOrder: Record<string, number> = { confirmed: 0, submitted: 10 }
-    const timeOrder = timeSlot === '21:00-23:00' ? 0 : 1 // 21時が先
+    const timeOrder = TIME_ORDER[timeSlot] ?? 99
     return (statusOrder[status] ?? 99) + timeOrder
   }
 
@@ -134,7 +148,7 @@ export default function Calendar({
     }
     const [startTime, endTime] = event.timeSlot.split('-')
     const sortOrder = getSortOrder(event.status, event.timeSlot)
-    const timeDisplay = event.timeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'
+    const timeDisplay = TIME_LABELS[event.timeSlot] || event.timeSlot
     const title = `${event.instructorName}講師\n${timeDisplay}`
     // 開始時間をソート順に合わせて調整（00:00, 00:01, 00:10, 00:11, etc.）
     const sortHour = Math.floor(sortOrder / 10)
@@ -308,7 +322,7 @@ export default function Calendar({
               const event = props.event.resource as SessionCandidate
               if (!event) return <div>{props.title}</div>
               
-              const timeDisplay = event.timeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'
+              const timeDisplay = TIME_LABELS[event.timeSlot] || event.timeSlot
               const avatarUrl = instructorAvatars?.[event.instructorId]
               
               // 確定カレンダー用の大きい表示
@@ -361,20 +375,30 @@ export default function Calendar({
               const dateStr = toLocalDateStr(new Date(date))
               const moreCount = moreCountByDate.get(dateStr) || 0
               const conflicts = googleCalendarConflicts?.get(dateStr) || new Set<TimeSlot>()
+              const hasConflict10 = conflicts.has('10:00-12:00')
+              const hasConflict12 = conflicts.has('12:00-14:00')
               const hasConflict21 = conflicts.has('21:00-23:00')
               const hasConflict22 = conflicts.has('22:00-24:00')
-              
+
+              const hasSubmitted10 = submittedSlots?.some(
+                (slot) => toLocalDateStr(new Date(slot.date)) === dateStr && slot.timeSlot === '10:00-12:00'
+              ) ?? false
+              const hasSubmitted12 = submittedSlots?.some(
+                (slot) => toLocalDateStr(new Date(slot.date)) === dateStr && slot.timeSlot === '12:00-14:00'
+              ) ?? false
               const hasSubmitted21 = submittedSlots?.some(
                 (slot) => toLocalDateStr(new Date(slot.date)) === dateStr && slot.timeSlot === '21:00-23:00'
               ) ?? false
               const hasSubmitted22 = submittedSlots?.some(
                 (slot) => toLocalDateStr(new Date(slot.date)) === dateStr && slot.timeSlot === '22:00-24:00'
               ) ?? false
-              
+
+              const isSelected10 = selectedSlots?.has(`${dateStr}_10:00-12:00`) ?? false
+              const isSelected12 = selectedSlots?.has(`${dateStr}_12:00-14:00`) ?? false
               const isSelected21 = selectedSlots?.has(`${dateStr}_21:00-23:00`) ?? false
               const isSelected22 = selectedSlots?.has(`${dateStr}_22:00-24:00`) ?? false
-              // グレーアウトはGoogleカレンダーの競合のみ（両方の時間帯が競合している場合）
-              const isGrayedOut = hasConflict21 && hasConflict22
+              // グレーアウトはGoogleカレンダーの競合のみ（全ての時間帯が競合している場合）
+              const isGrayedOut = hasConflict10 && hasConflict12 && hasConflict21 && hasConflict22
 
               return (
                 <div
@@ -395,7 +419,7 @@ export default function Calendar({
                     cursor: onSelectSlot && !isGrayedOut ? 'pointer' : 'default',
                     width: '100%',
                     height: '100%',
-                    minHeight: '100px',
+                    minHeight: '140px',
                     position: 'relative',
                     opacity: isGrayedOut ? 0.5 : 1,
                     backgroundColor: isGrayedOut ? '#e5e7eb' : 'transparent',
@@ -418,9 +442,43 @@ export default function Calendar({
                   )}
                   
                   {onToggleSlot && !isGrayedOut && (
-                    <div className="absolute bottom-1 left-1 right-1 flex flex-col gap-1 z-10">
+                    <div className="absolute bottom-1 left-1 right-1 grid grid-cols-2 gap-1 z-10">
+                      {!hasConflict10 && !hasSubmitted10 && (
+                        <div className="flex items-center gap-0.5">
+                          <input
+                            type="checkbox"
+                            checked={isSelected10}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              e.preventDefault()
+                              onToggleSlot(dateStr, '10:00-12:00')
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
+                            title="10時〜12時を選択"
+                          />
+                          <span className="text-xs text-gray-700 whitespace-nowrap">10:00〜</span>
+                        </div>
+                      )}
+                      {!hasConflict12 && !hasSubmitted12 && (
+                        <div className="flex items-center gap-0.5">
+                          <input
+                            type="checkbox"
+                            checked={isSelected12}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              e.preventDefault()
+                              onToggleSlot(dateStr, '12:00-14:00')
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
+                            title="12時〜14時を選択"
+                          />
+                          <span className="text-xs text-gray-700 whitespace-nowrap">12:00〜</span>
+                        </div>
+                      )}
                       {!hasConflict21 && !hasSubmitted21 && (
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-0.5">
                           <input
                             type="checkbox"
                             checked={isSelected21}
@@ -430,14 +488,14 @@ export default function Calendar({
                               onToggleSlot(dateStr, '21:00-23:00')
                             }}
                             onClick={(e) => e.stopPropagation()}
-                            className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
+                            className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
                             title="21時〜23時を選択"
                           />
-                          <span className="text-sm sm:text-base text-gray-700 whitespace-nowrap">21:00〜</span>
+                          <span className="text-xs text-gray-700 whitespace-nowrap">21:00〜</span>
                         </div>
                       )}
                       {!hasConflict22 && !hasSubmitted22 && (
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-0.5">
                           <input
                             type="checkbox"
                             checked={isSelected22}
@@ -447,10 +505,10 @@ export default function Calendar({
                               onToggleSlot(dateStr, '22:00-24:00')
                             }}
                             onClick={(e) => e.stopPropagation()}
-                            className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
+                            className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
                             title="22時〜24時を選択"
                           />
-                          <span className="text-sm sm:text-base text-gray-700 whitespace-nowrap">22:00〜</span>
+                          <span className="text-xs text-gray-700 whitespace-nowrap">22:00〜</span>
                         </div>
                       )}
                     </div>
@@ -483,7 +541,7 @@ export default function Calendar({
             </div>
             <div className="space-y-2">
               {getEventsForDate(expandedDate).map((event) => {
-                const timeDisplay = event.timeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'
+                const timeDisplay = TIME_LABELS[event.timeSlot] || event.timeSlot
                 const statusColor = event.status === 'confirmed' 
                   ? 'bg-green-500' 
                   : 'bg-yellow-500'

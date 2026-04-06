@@ -3,6 +3,13 @@
 import { useState, useEffect } from 'react'
 import { EventFormData, SessionCandidate, TimeSlot } from '@/types'
 
+const TIME_LABELS: Record<TimeSlot, string> = {
+  '10:00-12:00': '10時〜12時',
+  '12:00-14:00': '12時〜14時',
+  '21:00-23:00': '21時〜23時',
+  '22:00-24:00': '22時〜24時',
+}
+
 /** Date をローカル日付の YYYY-MM-DD に変換（UTC ずれを防ぐ） */
 function toLocalDateString(d: Date): string {
   const y = d.getFullYear()
@@ -95,11 +102,13 @@ export default function EventForm({ onSubmit, onCancel, initialDate, editingEven
               required
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
             >
+              <option value="10:00-12:00">10時〜12時</option>
+              <option value="12:00-14:00">12時〜14時</option>
               <option value="21:00-23:00">21時〜23時</option>
               <option value="22:00-24:00">22時〜24時</option>
             </select>
             <p className="text-sm text-gray-500 mt-1">
-              選択中の時間: {timeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'}
+              選択中の時間: {TIME_LABELS[timeSlot]}
             </p>
           </div>
           <div>
