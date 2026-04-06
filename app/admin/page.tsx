@@ -26,7 +26,7 @@ function formatDateYYYYMMDD(d: Date): string {
 export default function AdminPage() {
   const router = useRouter()
   const { data: session, status } = useSession()
-  const { currentUser, events, updateEventStatus, updateEvent, deleteEvent, getEventsByStatus, fetchEvents, setCurrentUser } =
+  const { currentUser, events, updateEventStatus, updateEvent, deleteEvent, getEventsByStatus, fetchEvents, fetchAllEvents, setCurrentUser } =
     useEventStore()
   const [pendingEvents, setPendingEvents] = useState<SessionCandidate[]>([])
   const [confirmedEvents, setConfirmedEvents] = useState<SessionCandidate[]>([])
@@ -52,15 +52,15 @@ export default function AdminPage() {
 
   // 取得後にGoogleカレンダーで削除された予定を検知してDBから削除し、必要なら再取得
   const fetchEventsAndSyncDeleted = useCallback(async () => {
-    await fetchEvents()
+    await fetchAllEvents()
     try {
       const res = await fetch('/api/google-calendar/sync-deleted', { method: 'POST' })
       const data = await res.json()
-      if (data.deletedEventIds?.length > 0) await fetchEvents()
+      if (data.deletedEventIds?.length > 0) await fetchAllEvents()
     } catch {
       // 同期失敗時は握りつぶす（一覧は表示済み）
     }
-  }, [fetchEvents])
+  }, [fetchAllEvents])
 
   useEffect(() => {
     fetchEventsAndSyncDeleted()

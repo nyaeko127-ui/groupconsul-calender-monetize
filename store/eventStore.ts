@@ -16,6 +16,7 @@ interface EventStore {
   getEventsByInstructor: (instructorId: string) => SessionCandidate[]
   getAuditLogs: () => AuditLog[]
   fetchEvents: () => Promise<void>
+  fetchAllEvents: () => Promise<void>
   fetchAuditLogs: () => Promise<void>
   initializeFromLocalStorage: () => void
   saveToLocalStorage: () => void
@@ -93,6 +94,38 @@ export const useEventStore = create<EventStore>((set, get) => ({
       set({ events, isLoading: false })
     } catch (error) {
       console.error('Error fetching events:', error)
+      set({ isLoading: false })
+    }
+  },
+
+  // サーバーサイドAPIを経由して全イベントを取得（RLSをバイパス）
+  fetchAllEvents: async () => {
+    set({ isLoading: true })
+    try {
+      const response = await fetch('/api/events')
+      if (!response.ok) {
+        console.error('fetchAllEvents failed:', response.status)
+        set({ isLoading: false })
+        return
+      }
+      const data = await response.json()
+      const events = (data.events || []).map((row: any): SessionCandidate => ({
+        id: row.id,
+        instructorId: row.instructor_id,
+        instructorName: row.instructor_name,
+        month: row.month,
+        date: new Date(row.date),
+        timeSlot: row.time_slot as SessionCandidate['timeSlot'],
+        memo: row.memo || undefined,
+        status: row.status as SessionCandidate['status'],
+        submittedAt: new Date(row.submitted_at),
+        confirmedAt: row.confirmed_at ? new Date(row.confirmed_at) : undefined,
+        googleCalendarEventId: row.google_calendar_event_id || undefined,
+        adminGoogleCalendarEventId: row.admin_google_calendar_event_id || undefined,
+      }))
+      set({ events, isLoading: false })
+    } catch (error) {
+      console.error('Error in fetchAllEvents:', error)
       set({ isLoading: false })
     }
   },
