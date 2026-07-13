@@ -6,6 +6,13 @@ import { useSession } from 'next-auth/react'
 import { useEventStore } from '@/store/eventStore'
 import { User, AuditLog } from '@/types'
 
+const TIME_LABELS: Record<string, string> = {
+  '10:00-12:00': '10時〜12時',
+  '12:00-14:00': '12時〜14時',
+  '21:00-23:00': '21時〜23時',
+  '22:00-24:00': '22時〜24時',
+}
+
 export default function AuditLogPage() {
   const router = useRouter()
   const { data: session, status } = useSession()
@@ -165,7 +172,7 @@ export default function AuditLogPage() {
                         })}
                       </td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
-                        {log.eventTimeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'}
+                        {TIME_LABELS[log.eventTimeSlot] || log.eventTimeSlot}
                       </td>
                     </tr>
                   ))

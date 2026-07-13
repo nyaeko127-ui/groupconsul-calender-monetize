@@ -50,23 +50,11 @@ export default function AdminPage() {
     setConfirmedEvents(allEvents.filter((event) => event.status === 'confirmed'))
   }, [events])
 
-  // 取得後にGoogleカレンダーで削除された予定を検知してDBから削除し、必要なら再取得
-  const fetchEventsAndSyncDeleted = useCallback(async () => {
-    await fetchAllEvents()
-    try {
-      const res = await fetch('/api/google-calendar/sync-deleted', { method: 'POST' })
-      const data = await res.json()
-      if (data.deletedEventIds?.length > 0) await fetchAllEvents()
-    } catch {
-      // 同期失敗時は握りつぶす（一覧は表示済み）
-    }
-  }, [fetchAllEvents])
-
   useEffect(() => {
-    fetchEventsAndSyncDeleted()
-    const interval = setInterval(fetchEventsAndSyncDeleted, 5000)
+    fetchAllEvents()
+    const interval = setInterval(fetchAllEvents, 5000)
     return () => clearInterval(interval)
-  }, [fetchEventsAndSyncDeleted])
+  }, [fetchAllEvents])
 
   // 運営ユーザーを設定
   useEffect(() => {
@@ -162,48 +150,10 @@ export default function AdminPage() {
     setSelectedEventIdForEditDelete('')
   }
 
-  // Googleカレンダーから予定を削除するヘルパー関数（講師・運営の両方から削除）
-  const deleteFromGoogleCalendar = async (event: SessionCandidate) => {
-    if (!event.googleCalendarEventId && !event.adminGoogleCalendarEventId) return true
-    
-    try {
-      const response = await fetch('/api/google-calendar/delete-event', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          instructorId: event.instructorId,
-          googleCalendarEventId: event.googleCalendarEventId ?? undefined,
-          adminEventId: event.adminGoogleCalendarEventId ?? undefined,
-        }),
-      })
-      
-      const data = await response.json()
-      if (!response.ok) {
-        console.error('Googleカレンダーからの削除に失敗:', data.message)
-        return false
-      }
-      return true
-    } catch (error) {
-      console.error('Googleカレンダー削除エラー:', error)
-      return false
-    }
-  }
-
   const handleAdminDelete = async () => {
     if (!eventForEditDelete) return
     if (!confirm(`${formatEventOption(eventForEditDelete)} を削除しますか？`)) return
-    
-    // 確定済みの予定の場合、講師・運営のGoogleカレンダーからも削除
-    if (
-      eventForEditDelete.status === 'confirmed' &&
-      (eventForEditDelete.googleCalendarEventId || eventForEditDelete.adminGoogleCalendarEventId)
-    ) {
-      const gcalDeleted = await deleteFromGoogleCalendar(eventForEditDelete)
-      if (!gcalDeleted) {
-        alert('Googleカレンダーからの削除に失敗しましたが、システムからは削除します')
-      }
-    }
-    
+
     deleteEvent(eventForEditDelete.id, true) // forceAdmin=true で運営として削除
     setSelectedEventIdForEditDelete('')
   }
@@ -253,50 +203,6 @@ export default function AdminPage() {
     const adminUserForLog = adminUser || user
     updateEventStatus(eventId, 'confirmed', adminUserForLog)
 
-    // 運営カレンダー用の登録名：その日の確定件数が1件なら「グルコン 講師名」、2件なら「講師対談 講師名」
-    const eventDateStr = eventToConfirm.date.toISOString().split('T')[0]
-    const otherConfirmedOnDate = getConfirmedOnDate(eventDateStr, eventId).length
-    const confirmedCountOnDate = otherConfirmedOnDate + 1
-    const adminEventTitle =
-      confirmedCountOnDate === 1
-        ? `グルコン ${eventToConfirm.instructorName}`
-        : `講師対談 ${eventToConfirm.instructorName}`
-
-    // 講師のGoogleカレンダーに予定を追加 ＋ 運営アカウントのGoogleカレンダーにも追加
-    try {
-      const response = await fetch('/api/google-calendar/add-event', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          instructorId: eventToConfirm.instructorId,
-          instructorName: eventToConfirm.instructorName,
-          date: formatDateYYYYMMDD(eventToConfirm.date),
-          timeSlot: eventToConfirm.timeSlot,
-          title: 'グルコン',
-          adminEventTitle,
-        }),
-      })
-      
-      const data = await response.json()
-      if (response.ok && data.eventId) {
-        console.log('Googleカレンダーに予定を追加しました:', data)
-        // GoogleカレンダーのイベントIDを保存（講師・運営）
-        updateEvent(eventId, {
-          googleCalendarEventId: data.eventId,
-          ...(data.adminEventId && { adminGoogleCalendarEventId: data.adminEventId }),
-        })
-      } else {
-        console.error('Googleカレンダーへの追加に失敗:', data.message)
-        // エラーがあっても確定自体は成功しているので、警告のみ表示
-        alert(`確定しましたが、Googleカレンダーへの追加に失敗しました: ${data.message}`)
-      }
-    } catch (error) {
-      console.error('Googleカレンダー連携エラー:', error)
-      alert('確定しましたが、Googleカレンダーへの連携でエラーが発生しました')
-    }
-    
     setSelectedEvent(null)
     setSelectedEventIds((prev) => {
       const newSet = new Set(prev)
@@ -354,13 +260,6 @@ export default function AdminPage() {
     })
     const timeStr = TIME_LABELS[event.timeSlot] || event.timeSlot
     if (confirm(`${event.instructorName}の${dateStr} ${timeStr} の候補を削除しますか？`)) {
-      // 確定済みの予定の場合、Googleカレンダーからも削除
-      if (event.status === 'confirmed' && event.googleCalendarEventId) {
-        const gcalDeleted = await deleteFromGoogleCalendar(event)
-        if (!gcalDeleted) {
-          alert('Googleカレンダーからの削除に失敗しましたが、システムからは削除します')
-        }
-      }
       deleteEvent(event.id, true) // forceAdmin=true で運営として削除
     }
   }
@@ -461,65 +360,15 @@ export default function AdminPage() {
         `選択した${selectedEventIds.size}件の候補を確定しますか？`
       )
     ) {
-      // 各候補を確定し、Googleカレンダーに追加
-      const failedEvents: string[] = []
-      
+      // 各候補を確定
       for (const eventId of selectedEventIds) {
         const event = eventsToConfirm.find(e => e.id === eventId)
         if (!event) continue
-        
-        updateEventStatus(eventId, 'confirmed', user)
-        
-        // 運営カレンダー用の登録名（その日の確定件数で「グルコン」or「講師対談」）
-        const eventDateStr = formatDateYYYYMMDD(event.date)
-        const existingOnDate = getConfirmedOnDate(eventDateStr).filter(
-          (c) => !eventsToConfirm.some((t) => t.id === c.id)
-        ).length
-        const inBatchOnDate = eventsToConfirm.filter(
-          (e) => formatDateYYYYMMDD(e.date) === eventDateStr
-        ).length
-        const confirmedCountOnDate = existingOnDate + inBatchOnDate
-        const adminEventTitle =
-          confirmedCountOnDate === 1
-            ? `グルコン ${event.instructorName}`
-            : `講師対談 ${event.instructorName}`
 
-        // Googleカレンダーに追加（講師＋運営）
-        try {
-          const response = await fetch('/api/google-calendar/add-event', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              instructorId: event.instructorId,
-              instructorName: event.instructorName,
-              date: formatDateYYYYMMDD(event.date),
-              timeSlot: event.timeSlot,
-              title: 'グルコン',
-              adminEventTitle,
-            }),
-          })
-          
-          const data = await response.json()
-          if (response.ok && data.eventId) {
-            updateEvent(event.id, {
-              googleCalendarEventId: data.eventId,
-              ...(data.adminEventId && { adminGoogleCalendarEventId: data.adminEventId }),
-            })
-          } else {
-            failedEvents.push(`${event.instructorName}: ${data.message}`)
-          }
-        } catch (error) {
-          failedEvents.push(`${event.instructorName}: 通信エラー`)
-        }
+        updateEventStatus(eventId, 'confirmed', user)
       }
-      
+
       setSelectedEventIds(new Set())
-      
-      if (failedEvents.length > 0) {
-        alert(`確定しましたが、以下のGoogleカレンダー追加に失敗しました:\n${failedEvents.join('\n')}`)
-      }
     }
   }
 
@@ -534,28 +383,11 @@ export default function AdminPage() {
         `選択した${selectedEventIds.size}件の候補を削除しますか？`
       )
     ) {
-      const failedEvents: string[] = []
-      
       for (const eventId of selectedEventIds) {
-        const event = events.find(e => e.id === eventId)
-        if (!event) continue
-        
-        // 確定済みの予定の場合、Googleカレンダーからも削除
-        if (event.status === 'confirmed' && event.googleCalendarEventId) {
-          const gcalDeleted = await deleteFromGoogleCalendar(event)
-          if (!gcalDeleted) {
-            failedEvents.push(`${event.instructorName}: Googleカレンダー削除失敗`)
-          }
-        }
-        
         deleteEvent(eventId, true)
       }
-      
+
       setSelectedEventIds(new Set())
-      
-      if (failedEvents.length > 0) {
-        alert(`一部のGoogleカレンダー削除に失敗しました:\n${failedEvents.join('\n')}`)
-      }
     }
   }
 
@@ -719,56 +551,11 @@ export default function AdminPage() {
                       }
                       
                       if (confirm(`選択した${calendarSelectedIds.size}件の候補を確定しますか？`)) {
-                        const failedEvents: string[] = []
                         for (const event of selectedEvents) {
                           updateEventStatus(event.id, 'confirmed', user)
-                          
-                          // 運営カレンダー用の登録名（その日の確定件数で「グルコン」or「講師対談」）
-                          const eventDateStr = formatDateYYYYMMDD(event.date)
-                          const existingOnDate = getConfirmedOnDate(eventDateStr).filter(
-                            (c) => !selectedEvents.some((t) => t.id === c.id)
-                          ).length
-                          const inBatchOnDate = selectedEvents.filter(
-                            (e) => formatDateYYYYMMDD(e.date) === eventDateStr
-                          ).length
-                          const confirmedCountOnDate = existingOnDate + inBatchOnDate
-                          const adminEventTitle =
-                            confirmedCountOnDate === 1
-                              ? `グルコン ${event.instructorName}`
-                              : `講師対談 ${event.instructorName}`
-
-                          // Googleカレンダーに追加（講師＋運営）
-                          try {
-                            const response = await fetch('/api/google-calendar/add-event', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({
-                                instructorId: event.instructorId,
-                                instructorName: event.instructorName,
-                                date: formatDateYYYYMMDD(event.date),
-                                timeSlot: event.timeSlot,
-                                title: 'グルコン',
-                                adminEventTitle,
-                              }),
-                            })
-                            const data = await response.json()
-                            if (response.ok && data.eventId) {
-                              updateEvent(event.id, {
-                                googleCalendarEventId: data.eventId,
-                                ...(data.adminEventId && { adminGoogleCalendarEventId: data.adminEventId }),
-                              })
-                            } else {
-                              failedEvents.push(`${event.instructorName}: Googleカレンダー追加失敗`)
-                            }
-                          } catch (error) {
-                            failedEvents.push(`${event.instructorName}: 通信エラー`)
-                          }
                         }
                         setCalendarSelectedIds(new Set())
                         setIsMultiSelectMode(false)
-                        if (failedEvents.length > 0) {
-                          alert(`確定しましたが、以下のGoogleカレンダー追加に失敗しました:\n${failedEvents.join('\n')}`)
-                        }
                       }
                     }}
                     className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 font-medium"
@@ -778,29 +565,11 @@ export default function AdminPage() {
                   <button
                     onClick={async () => {
                       if (confirm(`選択した${calendarSelectedIds.size}件の候補を削除しますか？`)) {
-                        const failedEvents: string[] = []
-                        
                         for (const eventId of calendarSelectedIds) {
-                          const event = events.find(e => e.id === eventId)
-                          if (!event) continue
-                          
-                          // 確定済みの予定の場合、Googleカレンダーからも削除
-                          if (event.status === 'confirmed' && event.googleCalendarEventId) {
-                            const gcalDeleted = await deleteFromGoogleCalendar(event)
-                            if (!gcalDeleted) {
-                              failedEvents.push(`${event.instructorName}: Googleカレンダー削除失敗`)
-                            }
-                          }
-                          
                           deleteEvent(eventId, true)
                         }
-                        
                         setCalendarSelectedIds(new Set())
                         setIsMultiSelectMode(false)
-                        
-                        if (failedEvents.length > 0) {
-                          alert(`一部のGoogleカレンダー削除に失敗しました:\n${failedEvents.join('\n')}`)
-                        }
                       }
                     }}
                     className="bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700 font-medium"

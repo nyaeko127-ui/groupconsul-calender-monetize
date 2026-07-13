@@ -6,6 +6,13 @@ import { useEventStore } from '@/store/eventStore'
 import Calendar from '@/components/Calendar'
 import { SessionCandidate, User } from '@/types'
 
+const TIME_LABELS: Record<string, string> = {
+  '10:00-12:00': '10時〜12時',
+  '12:00-14:00': '12時〜14時',
+  '21:00-23:00': '21時〜23時',
+  '22:00-24:00': '22時〜24時',
+}
+
 export default function ConfirmedEventsPage() {
   const router = useRouter()
   const { currentUser, events, getEventsByStatus, initializeFromLocalStorage, setCurrentUser } = useEventStore()
@@ -158,7 +165,7 @@ export default function ConfirmedEventsPage() {
                           })}
                         </span>
                         <span className="text-gray-700">
-                          {event.timeSlot === '21:00-23:00' ? '21時〜23時' : '22時〜24時'}
+                          {TIME_LABELS[event.timeSlot] || event.timeSlot}
                         </span>
                         {event.memo && (
                           <span className="text-sm text-gray-600 italic">

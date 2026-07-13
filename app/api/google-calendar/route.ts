@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { google } from 'googleapis'
@@ -18,13 +20,9 @@ export async function GET(request: NextRequest) {
 
     // セッションからアクセストークンを取得
     const session = await getServerSession(authOptions)
-    
-    console.log('Session:', session) // デバッグ用
-    console.log('AccessToken:', session?.accessToken) // デバッグ用
-    
+
     if (!session?.accessToken) {
       // 未認証の場合は空の配列を返す
-      console.log('No access token found')
       return NextResponse.json({ events: [], authenticated: false })
     }
 
@@ -55,8 +53,6 @@ export async function GET(request: NextRequest) {
       start: event.start,
       end: event.end,
     })) || []
-
-    console.log('Fetched events:', events.length, events) // デバッグ用
 
     return NextResponse.json({ events, authenticated: true })
   } catch (error) {
