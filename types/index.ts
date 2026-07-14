@@ -23,6 +23,7 @@ export interface SessionCandidate {
   confirmedAt?: Date
   googleCalendarEventId?: string // 講師のGoogleカレンダーに追加された予定のID
   adminGoogleCalendarEventId?: string // 運営のGoogleカレンダーに追加された予定のID
+  trashedAt?: Date // ゴミ箱に入れた日時。未設定なら通常表示、設定済みならゴミ箱内
 }
 
 // 後方互換性のため、EventDate も残す（既存コードで使用）

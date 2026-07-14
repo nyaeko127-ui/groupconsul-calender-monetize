@@ -1,4 +1,4 @@
-// app/api/events/route.ts
+// app/api/events/trashed/route.ts
 export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
@@ -14,15 +14,19 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    if (!session.user.isAdmin) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const { data, error } = await supabaseAdmin
       .from('session_candidates')
       .select('*')
-      .is('trashed_at', null)
-      .order('date', { ascending: true })
+      .not('trashed_at', 'is', null)
+      .order('trashed_at', { ascending: false })
 
     if (error) {
       console.error('Supabase query error:', error)
-      return NextResponse.json({ error: 'Failed to fetch events' }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to fetch trashed events' }, { status: 500 })
     }
 
     return NextResponse.json({ events: data || [] })

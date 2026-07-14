@@ -20,6 +20,7 @@ export interface DBSessionCandidate {
   created_at: string
   google_calendar_event_id: string | null
   admin_google_calendar_event_id: string | null
+  trashed_at: string | null
 }
 
 export interface DBAuditLog {

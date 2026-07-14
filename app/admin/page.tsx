@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useEventStore } from '@/store/eventStore'
@@ -26,7 +26,7 @@ function formatDateYYYYMMDD(d: Date): string {
 export default function AdminPage() {
   const router = useRouter()
   const { data: session, status } = useSession()
-  const { currentUser, events, updateEventStatus, updateEvent, deleteEvent, getEventsByStatus, fetchEvents, fetchAllEvents, setCurrentUser } =
+  const { currentUser, events, updateEventStatus, updateEvent, deleteEvents, fetchAllEvents, setCurrentUser, trashedEvents, moveToTrash, restoreFromTrash, fetchTrashedEvents } =
     useEventStore()
   const [pendingEvents, setPendingEvents] = useState<SessionCandidate[]>([])
   const [confirmedEvents, setConfirmedEvents] = useState<SessionCandidate[]>([])
@@ -52,9 +52,13 @@ export default function AdminPage() {
 
   useEffect(() => {
     fetchAllEvents()
-    const interval = setInterval(fetchAllEvents, 5000)
+    fetchTrashedEvents()
+    const interval = setInterval(() => {
+      fetchAllEvents()
+      fetchTrashedEvents()
+    }, 5000)
     return () => clearInterval(interval)
-  }, [fetchAllEvents])
+  }, [fetchAllEvents, fetchTrashedEvents])
 
   // 運営ユーザーを設定
   useEffect(() => {
@@ -72,6 +76,16 @@ export default function AdminPage() {
   useEffect(() => {
     updateEvents()
   }, [events, updateEvents])
+
+  // 確定枠（確定済みと同じ日×同じ時間帯）に残っている未確定候補
+  const submittedInConfirmedSlots = useMemo(() => {
+    const confirmedSlotKeys = new Set(
+      confirmedEvents.map((e) => `${e.date.toISOString().split('T')[0]}_${e.timeSlot}`)
+    )
+    return pendingEvents.filter((e) =>
+      confirmedSlotKeys.has(`${e.date.toISOString().split('T')[0]}_${e.timeSlot}`)
+    )
+  }, [confirmedEvents, pendingEvents])
 
   // 未ログインまたは運営以外はアクセス不可
   if (status === 'loading') {
@@ -152,10 +166,15 @@ export default function AdminPage() {
 
   const handleAdminDelete = async () => {
     if (!eventForEditDelete) return
-    if (!confirm(`${formatEventOption(eventForEditDelete)} を削除しますか？`)) return
+    if (!confirm(`${formatEventOption(eventForEditDelete)} をゴミ箱に移動しますか？`)) return
 
-    deleteEvent(eventForEditDelete.id, true) // forceAdmin=true で運営として削除
-    setSelectedEventIdForEditDelete('')
+    try {
+      await moveToTrash([eventForEditDelete.id])
+      setSelectedEventIdForEditDelete('')
+    } catch (e) {
+      console.error('ゴミ箱への移動に失敗しました', e)
+      alert('ゴミ箱への移動に失敗しました')
+    }
   }
 
   /** 同じ日付の確定済み一覧（対象イベント除く） */
@@ -259,8 +278,13 @@ export default function AdminPage() {
       day: 'numeric',
     })
     const timeStr = TIME_LABELS[event.timeSlot] || event.timeSlot
-    if (confirm(`${event.instructorName}の${dateStr} ${timeStr} の候補を削除しますか？`)) {
-      deleteEvent(event.id, true) // forceAdmin=true で運営として削除
+    if (confirm(`${event.instructorName}の${dateStr} ${timeStr} の候補をゴミ箱に移動しますか？`)) {
+      try {
+        await moveToTrash([event.id])
+      } catch (e) {
+        console.error('ゴミ箱への移動に失敗しました', e)
+        alert('ゴミ箱への移動に失敗しました')
+      }
     }
   }
 
@@ -380,14 +404,75 @@ export default function AdminPage() {
 
     if (
       confirm(
-        `選択した${selectedEventIds.size}件の候補を削除しますか？`
+        `選択した${selectedEventIds.size}件の候補をゴミ箱に移動しますか？`
       )
     ) {
-      for (const eventId of selectedEventIds) {
-        deleteEvent(eventId, true)
+      try {
+        await moveToTrash([...selectedEventIds])
+        setSelectedEventIds(new Set())
+      } catch (e) {
+        console.error('ゴミ箱への移動に失敗しました', e)
+        alert('ゴミ箱への移動に失敗しました')
       }
+    }
+  }
 
-      setSelectedEventIds(new Set())
+  const handleDeleteConfirmedSlotLosers = async () => {
+    if (submittedInConfirmedSlots.length === 0) {
+      alert('削除対象の未確定候補はありません')
+      return
+    }
+    if (
+      confirm(
+        `確定済みの枠に残っている未確定候補 ${submittedInConfirmedSlots.length}件をゴミ箱に移動しますか？\n\n（確定と同じ日・同じ時間帯の未確定候補のみが対象です。確定済みの予定は削除されません。）`
+      )
+    ) {
+      try {
+        await moveToTrash(submittedInConfirmedSlots.map((e) => e.id))
+        setSelectedEventIds(new Set())
+      } catch (e) {
+        console.error('一括削除に失敗しました', e)
+        alert(
+          'ゴミ箱への移動に失敗しました。時間をおいて再度お試しください。\n（データベースが一時停止している可能性があります）'
+        )
+      }
+    }
+  }
+
+  const handleEmptyTrash = async () => {
+    if (trashedEvents.length === 0) return
+    if (
+      confirm(
+        `ゴミ箱の${trashedEvents.length}件を完全に削除しますか？この操作は取り消せません。`
+      )
+    ) {
+      try {
+        await deleteEvents(trashedEvents.map((e) => e.id))
+        await fetchTrashedEvents()
+      } catch (e) {
+        console.error('ゴミ箱を空にする処理に失敗しました', e)
+        alert('完全削除に失敗しました。時間をおいて再度お試しください。')
+      }
+    }
+  }
+
+  const handleRestoreOne = async (id: string) => {
+    try {
+      await restoreFromTrash([id])
+    } catch (e) {
+      console.error('復元に失敗しました', e)
+      alert(e instanceof Error ? e.message : '復元に失敗しました。時間をおいて再度お試しください。')
+    }
+  }
+
+  const handlePermanentDeleteOne = async (id: string) => {
+    if (!confirm('この候補を完全に削除しますか？取り消せません。')) return
+    try {
+      await deleteEvents([id])
+      await fetchTrashedEvents()
+    } catch (e) {
+      console.error('完全削除に失敗しました', e)
+      alert('完全削除に失敗しました。時間をおいて再度お試しください。')
     }
   }
 
@@ -564,17 +649,20 @@ export default function AdminPage() {
                   </button>
                   <button
                     onClick={async () => {
-                      if (confirm(`選択した${calendarSelectedIds.size}件の候補を削除しますか？`)) {
-                        for (const eventId of calendarSelectedIds) {
-                          deleteEvent(eventId, true)
+                      if (confirm(`選択した${calendarSelectedIds.size}件の候補をゴミ箱に移動しますか？`)) {
+                        try {
+                          await moveToTrash([...calendarSelectedIds])
+                          setCalendarSelectedIds(new Set())
+                          setIsMultiSelectMode(false)
+                        } catch (e) {
+                          console.error('ゴミ箱への移動に失敗しました', e)
+                          alert('ゴミ箱への移動に失敗しました')
                         }
-                        setCalendarSelectedIds(new Set())
-                        setIsMultiSelectMode(false)
                       }
                     }}
                     className="bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700 font-medium"
                   >
-                    選択した候補を削除
+                    選択した候補をゴミ箱へ
                   </button>
                   <button
                     onClick={() => {
@@ -602,6 +690,14 @@ export default function AdminPage() {
                   >
                     {selectedEventIds.size === pendingEvents.length ? '全解除' : '全選択'}
                   </button>
+                  {submittedInConfirmedSlots.length > 0 && (
+                    <button
+                      onClick={handleDeleteConfirmedSlotLosers}
+                      className="bg-red-600 text-white px-4 py-1 rounded text-sm hover:bg-red-700"
+                    >
+                      確定枠の未確定をゴミ箱へ ({submittedInConfirmedSlots.length})
+                    </button>
+                  )}
                   {selectedEventIds.size > 0 && (
                     <>
                       <button
@@ -614,7 +710,7 @@ export default function AdminPage() {
                         onClick={handleBulkDelete}
                         className="bg-gray-600 text-white px-4 py-1 rounded text-sm hover:bg-gray-700"
                       >
-                        選択した候補を削除 ({selectedEventIds.size})
+                        選択した候補をゴミ箱へ ({selectedEventIds.size})
                       </button>
                     </>
                   )}
@@ -687,12 +783,17 @@ export default function AdminPage() {
                             確定
                           </button>
                           <button
-                            onClick={(e) => {
+                            onClick={async (e) => {
                               e.stopPropagation()
                               const dateStr = new Date(event.date).toLocaleDateString('ja-JP')
                               const timeStr = TIME_LABELS[event.timeSlot] || event.timeSlot
-                              if (confirm(`${event.instructorName}の${dateStr} ${timeStr} の候補を削除しますか？`)) {
-                                deleteEvent(event.id, true)
+                              if (confirm(`${event.instructorName}の${dateStr} ${timeStr} の候補をゴミ箱に移動しますか？`)) {
+                                try {
+                                  await moveToTrash([event.id])
+                                } catch (err) {
+                                  console.error('ゴミ箱への移動に失敗しました', err)
+                                  alert('ゴミ箱への移動に失敗しました')
+                                }
                               }
                             }}
                             className="bg-gray-600 text-white px-3 py-1 rounded text-sm hover:bg-gray-700"
@@ -753,6 +854,78 @@ export default function AdminPage() {
                   ))
               )}
             </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6 mt-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">ゴミ箱（{trashedEvents.length}件）</h2>
+            {trashedEvents.length > 0 && (
+              <button
+                onClick={handleEmptyTrash}
+                className="bg-red-600 text-white px-4 py-1 rounded text-sm hover:bg-red-700"
+              >
+                ゴミ箱を空にする
+              </button>
+            )}
+          </div>
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {trashedEvents.length === 0 ? (
+              <p className="text-gray-500">ゴミ箱は空です</p>
+            ) : (
+              trashedEvents.map((event) => (
+                <div
+                  key={event.id}
+                  className="p-3 border rounded-lg bg-gray-50"
+                >
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{event.instructorName}講師</p>
+                        {event.status === 'confirmed' && (
+                          <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
+                            確定だった予定
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-gray-600">
+                        {event.date.toLocaleDateString('ja-JP', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          weekday: 'short',
+                        })}
+                      </p>
+                      <p className="text-gray-600">
+                        {TIME_LABELS[event.timeSlot] || event.timeSlot}
+                      </p>
+                      {event.memo && (
+                        <p className="text-sm text-gray-500 mt-1 italic">
+                          メモ: {event.memo}
+                        </p>
+                      )}
+                      <p className="text-sm text-gray-500 mt-1">
+                        ゴミ箱に移動した日時: {event.trashedAt?.toLocaleString('ja-JP')}
+                      </p>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => handleRestoreOne(event.id)}
+                        className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                      >
+                        元に戻す
+                      </button>
+                      <button
+                        onClick={() => handlePermanentDeleteOne(event.id)}
+                        className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                      >
+                        完全に削除
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
